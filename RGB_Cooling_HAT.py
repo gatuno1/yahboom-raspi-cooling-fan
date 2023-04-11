@@ -137,16 +137,16 @@ setFanSpeed(0x00)
 setRGBEffect(0x03)
 
 while True:
-    setOLEDshow()	
+    setOLEDshow()
     if g_temp >= 55:
         if fan_state != 1:
             setFanSpeed(0x01)
-            fan_state = 1        
+            fan_state = 1
     elif g_temp <= 48:
         if fan_state != 0:
             setFanSpeed(0x00)
             fan_state = 0
-    
+
     if count == 10:
         setRGBEffect(0x04)
     elif count == 20:

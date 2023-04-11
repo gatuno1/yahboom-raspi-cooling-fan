@@ -64,4 +64,3 @@ while True:
             setRGB(Max_LED, 0xff, 0x00, 0x00)
 
     time.sleep(.5)
-    

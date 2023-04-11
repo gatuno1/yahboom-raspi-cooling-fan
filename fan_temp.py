@@ -36,4 +36,3 @@ while True:
             bus.write_byte_data(addr, fan_reg, 0x01)
 
     time.sleep(1)
-    

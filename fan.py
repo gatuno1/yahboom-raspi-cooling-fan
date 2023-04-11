@@ -35,4 +35,3 @@ while True:
         time.sleep(1)
         state = 0
     time.sleep(1)
-    

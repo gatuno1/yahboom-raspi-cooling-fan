@@ -39,7 +39,7 @@ def calculateColor(temp):
         avgColor.append(avgByte)
 
     print("Calulated average: " + avgColor.__repr__())
-    
+
     return avgColor
 
 
@@ -56,7 +56,7 @@ def setRGB(num, r, g, b):
         bus.write_byte_data(addr, 0x03, b&0xff)
 
 
-        
+
 bus.write_byte_data(addr,rgb_off_reg,0x00)
 time.sleep(1)
 
@@ -72,4 +72,3 @@ while True:
         previousColor = color
 
     time.sleep(.5)
-    
