@@ -1,9 +1,11 @@
 #!/bin/sh
 
-sudo echo 'hdmi_force_hotplug=1' >> /boot/config.txt
+# Correction from https://www.shellcheck.net/wiki/SC2024
+echo 'hdmi_force_hotplug=1' | sudo tee -a /boot/config.txt > /dev/null
 
-cd /home/pi/.config/
+# Correction from https://www.shellcheck.net/wiki/SC2164
+cd /home/pi/.config/ || exit
 mkdir /home/pi/.config/autostart
-cd /home/pi/.config/autostart
+cd /home/pi/.config/autostart || exit
 cp /home/pi/RGB_Cooling_HAT/start.desktop /home/pi/.config/autostart/
 echo 'install ok!'
