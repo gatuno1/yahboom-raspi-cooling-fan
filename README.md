@@ -1,13 +1,13 @@
 # yahboom-raspi-cooling-fan
 
 Crowd-sourced code for the "Yahboom Raspberry Pi Cooling HAT with
-Intelligent Temperature Control": 
+Intelligent Temperature Control":
 
 ![HAT Image](yahboom-rgb-pi-hat.jpg)
 
 I converted the code to Python 3 and tested it on
-**Raspberry Pi OS 32-bit**. [attenzione](https://github.com/attenzione) tested it
-successfully on **Ubuntu 64-bit** and his notes are incorporated below.
+**Raspberry Pi OS 32-bit**. Also, users [gatuno1](https://github.com/gatuno1) and [attenzione](https://github.com/attenzione) tested it
+successfully on **Raspberry Pi OS 64-bit** and **Ubuntu 64-bit** respectively, and his notes are incorporated below.
 
 
 ## How to run the Python code
@@ -23,7 +23,11 @@ Use, for example, the [raspi-config](https://www.raspberrypi.org/documentation/c
 ```bash
 sudo pip3 install Adafruit_BBIO Adafruit-SSD1306
 ```
+### Raspberry Pi OS 64-bit
 
+```bash
+sudo pip3 install Adafruit-SSD1306 Pillow
+```
 ### Ubuntu 64-bit
 
 ```bash
