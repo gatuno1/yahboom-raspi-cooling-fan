@@ -1,83 +1,79 @@
+from gpiozero import CPUTemperature
 import smbus
-import re
-import time
-import subprocess as sp
-from typing import Tuple
+import signal
+from time import sleep
+from datetime import datetime
 
-DEV_ADDR = 0x0d
-FAN_REG = 0x08
-WRITE_RETRIES : int = 3
+DEVICE_ADDRESS = 0x0d
+REGISTER_ADDRESS = 0x08
 
-temp_value : float
+bus_number = 1
 hysteresis_temp : float = 10.0
 trigger_temp : float = 52.0
-fan_status = ""
-last_fan_status : str = "FLOAT"
+max_attempts = 3
+sleep_seconds = 2.0
 
-values_dict = {"OFF": 0x00, "ON": 0x01}
+temperature : float
+last_fan_status = ""
 
-bus = smbus.SMBus(1)
-pattern = re.compile(r'temp=(\d+\.\d+)')
+def log(msg):
+    print('{}: {}'.format(datetime.now(), msg))
 
+def tidyup(msg, *args):
+    log("Caught terminate signal. Cleanup fan off.")
+    set_fan("OFF")
+    exit(0)
 
 def set_fan(state: str):
-    attempt = 1
     success = False
-    value : int = values_dict[state]
-    print("State: '{}', value: {}".format(state,value))
-    while not success and attempt <= WRITE_RETRIES:
+    attempt = 1
+    value = 0x01 if state == "ON" else 0x00
+    while not success and attempt <= max_attempts:
         try:
-            bus.write_byte_data(DEV_ADDR, FAN_REG, value)
-        except BaseException as e:
-            print("Failed attempt #{} to write.".format(attempt))
-            attempt += 1
-            if attempt > WRITE_RETRIES:
-                print("Giving up after {} attempts.".format(WRITE_RETRIES))
-                raise e
-            time.sleep(0.2)
+            i2c.write_byte_data(DEVICE_ADDRESS, REGISTER_ADDRESS, value)
+        except IOError as e:
+            if attempt <= max_attempts:
+                attempt += 1
+            else:
+                msg = "Cannot write to i2c device after {} attempts.".format(attempt)
+                log(msg + " Aborting.")
+                raise RuntimeError(msg) from e
         else:
             success = True
-            if attempt >= 1:
-                print("Write success on attempt #{}.".format(attempt))
 
+signal.signal(signal.SIGINT, tidyup)
+signal.signal(signal.SIGTERM, tidyup)
 
-
-def read_temp() -> Tuple[float, str]:
-    proc = sp.run(['vcgencmd', 'measure_temp'], stdout=sp.PIPE, stderr=sp.STDOUT, universal_newlines=True)
-    if proc.returncode != 0:
-        print('Error: temperature reading failed.')
-        exit(1)
-    match = pattern.search(proc.stdout)
-    if match:
-        temp_text = match.group(1)
-    else:
-        print('Error: temperature reading failed.')
-        exit(1)
-    temp = float(temp_text)
-    return temp, temp_text;
-
-
-# set_fan(fan_status)
-# print("Init Fan: " + fan_status)
+#Reference of smbus module exceptions:
+# https://github.com/Gadgetoid/py-smbus/blob/master/library/smbusmodule.c
+try:
+    i2c = smbus.SMBus(bus_number)
+except OverflowError as e:
+    msg = "Bus number is invalid when try opening bus '{}'".format(bus_number)
+    log(msg)
+    raise RuntimeError(msg) from e
+except IOError as e:
+    msg = "IO Error: Cannot open bus '{}'".format(bus_number)
+    log(msg)
+    raise RuntimeError(msg) from e
 
 while True:
-    fan_status = None
-    temp_value, temperature = read_temp()
+    fan_status = "NONE"
+    temperature = CPUTemperature().temperature
 
-    if temp_value >= trigger_temp:
+    if temperature >= trigger_temp:
         fan_status = "ON"
-    elif temp_value <= trigger_temp - hysteresis_temp:
+    elif temperature <= trigger_temp - hysteresis_temp:
         fan_status = "OFF"
 
-    if fan_status != None:
-    #if fan_status != "" and fan_status != last_fan_status:
-        #last_fan_status = fan_status
+    if fan_status != "NONE" and fan_status != last_fan_status:
+        last_fan_status = fan_status
         set_fan(fan_status)
-        print("Temp: {}°C, Fan: {}".format(temperature, fan_status))
+        log('Temp: {}°C, Fan action: {}'.format(CPUTemperature().temperature, fan_status))
     else:
-        print("Temp: {}°C".format(temperature))
-
-    time.sleep(1.5)
+        print('Temp: {}°C'.format(CPUTemperature().temperature))
+        
+    sleep(sleep_seconds)
 
 #OFF: i2cset -y 1 0x0d 0x08 0x00
 #ON:  i2cset -y 1 0x0d 0x08 0x01
