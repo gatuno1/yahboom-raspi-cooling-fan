@@ -1,26 +1,28 @@
 from gpiozero import CPUTemperature
-import smbus
+import smbus2
 import signal
 from time import sleep
 from datetime import datetime
+import logging
+from systemd import journal
 
 DEVICE_ADDRESS = 0x0d
 REGISTER_ADDRESS = 0x08
+MODULE_NAME = "yahboom-fan-ctrl"
 
 bus_number = 1
 hysteresis_temp : float = 10.0
 trigger_temp : float = 52.0
 max_attempts = 3
 sleep_seconds = 2.0
+log_file = "./" + MODULE_NAME + ".log"
+verbose = 1
 
 temperature : float
 last_fan_status = ""
 
-def log(msg):
-    print('{}: {}'.format(datetime.now(), msg))
-
 def tidyup(msg, *args):
-    log("Caught terminate signal. Cleanup fan off.")
+    logger.info("Caught terminate signal. Turn fan off.\n")
     set_fan("OFF")
     exit(0)
 
@@ -30,33 +32,53 @@ def set_fan(state: str):
     value = 0x01 if state == "ON" else 0x00
     while not success and attempt <= max_attempts:
         try:
-            i2c.write_byte_data(DEVICE_ADDRESS, REGISTER_ADDRESS, value)
-        except IOError as e:
+            with smbus2.SMBus(bus_number) as i2c:
+                i2c.enable_pec(True)
+                i2c.write_byte_data(DEVICE_ADDRESS, REGISTER_ADDRESS, value)
+                i2c.close()
+        except (FileNotFoundError, PermissionError, IOError) as e:
             if attempt <= max_attempts:
                 attempt += 1
+                if verbose >= 2:
+                    logger.exception("Write i2c error, attempt {}.".format(attempt), exc_info=1)
             else:
                 msg = "Cannot write to i2c device after {} attempts.".format(attempt)
-                log(msg + " Aborting.")
+                logger.critical(msg + " Aborting\n.", exc_info=1)
                 raise RuntimeError(msg) from e
         else:
             success = True
 
+# System signal management
 signal.signal(signal.SIGINT, tidyup)
+signal.signal(signal.SIGQUIT, tidyup)
 signal.signal(signal.SIGTERM, tidyup)
 
-#Reference of smbus module exceptions:
-# https://github.com/Gadgetoid/py-smbus/blob/master/library/smbusmodule.c
-try:
-    i2c = smbus.SMBus(bus_number)
-except OverflowError as e:
-    msg = "Bus number is invalid when try opening bus '{}'".format(bus_number)
-    log(msg)
-    raise RuntimeError(msg) from e
-except IOError as e:
-    msg = "IO Error: Cannot open bus '{}'".format(bus_number)
-    log(msg)
-    raise RuntimeError(msg) from e
+#Log management
+# Reference: https://docs.python.org/3.9/howto/logging.html
+logger = logging.getLogger(MODULE_NAME)
+logger.setLevel(logging.DEBUG if verbose >=2 else logging.INFO)
+# Reference for log to file: https://stackoverflow.com/questions/6386698/how-to-write-to-a-file-using-the-logging-python-module
+fh = logging.FileHandler(log_file)
+fh.setLevel(logging.DEBUG if verbose >=2 else logging.INFO)
+formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+fh.setFormatter(formatter)
+logger.addHandler(fh)
 
+#Init
+logger.info("Starting {} log.".format(MODULE_NAME))
+try:
+    with smbus2.SMBus(bus_number) as i2c:
+        i2c.enable_pec(True)
+        i2c.write_byte_data(DEVICE_ADDRESS, REGISTER_ADDRESS, 0x00)
+        i2c.close()
+except Exception as e:
+    msg = "Cannot open i2c device at address '{}'! Aborting\n.".format(DEVICE_ADDRESS)
+    logger.critical(msg)
+    raise RuntimeError(msg) from e
+else:
+    logger.info("Connected successfully to i2c device at address '{}'".format(DEVICE_ADDRESS))
+
+#Main loop
 while True:
     fan_status = "NONE"
     temperature = CPUTemperature().temperature
@@ -69,11 +91,11 @@ while True:
     if fan_status != "NONE" and fan_status != last_fan_status:
         last_fan_status = fan_status
         set_fan(fan_status)
-        log('Temp: {}°C, Fan action: {}'.format(CPUTemperature().temperature, fan_status))
-    else:
-        print('Temp: {}°C'.format(CPUTemperature().temperature))
+        logger.info('Temp: {}°C, Fan action: {}'.format(CPUTemperature().temperature, fan_status))
+    elif verbose >= 2:
+        logger.debug('Temp: {}°C'.format(CPUTemperature().temperature))
         
     sleep(sleep_seconds)
 
-#OFF: i2cset -y 1 0x0d 0x08 0x00
-#ON:  i2cset -y 1 0x0d 0x08 0x01
+#OFF: sudo i2cset -y 1 0x0d 0x08 0x00
+#ON:  sudo i2cset -y 1 0x0d 0x08 0x01
