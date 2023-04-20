@@ -2,7 +2,6 @@ from gpiozero import CPUTemperature
 import smbus2
 import signal
 from time import sleep
-from datetime import datetime
 import logging
 from systemd import journal
 
@@ -21,8 +20,8 @@ verbose = 1
 temperature : float
 last_fan_status = ""
 
-def tidyup(msg, *args):
-    logger.info("Caught terminate signal. Turn fan off.\n")
+def tidyup(signal, frame):
+    logger.info("Caught terminate signal '{}'. Turn fan off.\n".format(signal))
     set_fan("OFF")
     exit(0)
 
@@ -40,17 +39,17 @@ def set_fan(state: str):
             if attempt <= max_attempts:
                 attempt += 1
                 if verbose >= 2:
-                    logger.exception("Write i2c error, attempt {}.".format(attempt), exc_info=1)
+                    logger.exception("Write i2c error, attempt {}.".format(attempt), exc_info=True)
             else:
                 msg = "Cannot write to i2c device after {} attempts.".format(attempt)
-                logger.critical(msg + " Aborting\n.", exc_info=1)
+                logger.critical(msg + " Aborting\n.", exc_info=True)
                 raise RuntimeError(msg) from e
         else:
             success = True
 
 # System signal management
 signal.signal(signal.SIGINT, tidyup)
-signal.signal(signal.SIGQUIT, tidyup)
+signal.signal(signal.SIGKILL, tidyup)
 signal.signal(signal.SIGTERM, tidyup)
 
 #Log management
@@ -72,11 +71,11 @@ try:
         i2c.write_byte_data(DEVICE_ADDRESS, REGISTER_ADDRESS, 0x00)
         i2c.close()
 except Exception as e:
-    msg = "Cannot open i2c device at address '{}'! Aborting\n.".format(DEVICE_ADDRESS)
+    msg = "Cannot open i2c device at address '{}'! Aborting\n.".format(hex(DEVICE_ADDRESS))
     logger.critical(msg)
     raise RuntimeError(msg) from e
 else:
-    logger.info("Connected successfully to i2c device at address '{}'".format(DEVICE_ADDRESS))
+    logger.info("Connected successfully to i2c device at address '{}'".format(hex(DEVICE_ADDRESS)))
 
 #Main loop
 while True:
@@ -94,7 +93,7 @@ while True:
         logger.info('Temp: {}°C, Fan action: {}'.format(CPUTemperature().temperature, fan_status))
     elif verbose >= 2:
         logger.debug('Temp: {}°C'.format(CPUTemperature().temperature))
-        
+
     sleep(sleep_seconds)
 
 #OFF: sudo i2cset -y 1 0x0d 0x08 0x00
