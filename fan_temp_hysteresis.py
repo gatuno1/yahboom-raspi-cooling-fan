@@ -42,14 +42,14 @@ def set_fan(state: str):
                     logger.exception("Write i2c error, attempt {}.".format(attempt), exc_info=True)
             else:
                 msg = "Cannot write to i2c device after {} attempts.".format(attempt)
-                logger.critical(msg + " Aborting\n.", exc_info=True)
+                logger.critical(msg + " Aborting.\n", exc_info=True)
                 raise RuntimeError(msg) from e
         else:
             success = True
 
 # System signal management
 signal.signal(signal.SIGINT, tidyup)
-signal.signal(signal.SIGKILL, tidyup)
+signal.signal(signal.SIGQUIT, tidyup)
 signal.signal(signal.SIGTERM, tidyup)
 
 #Log management
@@ -71,11 +71,13 @@ try:
         i2c.write_byte_data(DEVICE_ADDRESS, REGISTER_ADDRESS, 0x00)
         i2c.close()
 except Exception as e:
-    msg = "Cannot open i2c device at address '{}'! Aborting\n.".format(hex(DEVICE_ADDRESS))
+    msg = "Cannot open bus {}, i2c device at address '{}'! Aborting.\n".format(bus_number, hex(DEVICE_ADDRESS))
     logger.critical(msg)
     raise RuntimeError(msg) from e
 else:
-    logger.info("Connected successfully to i2c device at address '{}'".format(hex(DEVICE_ADDRESS)))
+    logger.info("Connected successfully to bus {}, i2c device at address '{}'.".format(bus_number, hex(DEVICE_ADDRESS)))
+
+logger.info("Initial temperature: {:.2f}°C".format(CPUTemperature().temperature))
 
 #Main loop
 while True:
@@ -90,9 +92,9 @@ while True:
     if fan_status != "NONE" and fan_status != last_fan_status:
         last_fan_status = fan_status
         set_fan(fan_status)
-        logger.info('Temp: {}°C, Fan action: {}'.format(CPUTemperature().temperature, fan_status))
+        logger.info('Temp: {:.2f}°C, Fan action: {}'.format(CPUTemperature().temperature, fan_status))
     elif verbose >= 2:
-        logger.debug('Temp: {}°C'.format(CPUTemperature().temperature))
+        logger.debug('Temp: {:.2f}°C'.format(CPUTemperature().temperature))
 
     sleep(sleep_seconds)
 
