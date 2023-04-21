@@ -19,7 +19,7 @@ usermod -a -G i2c,gpio "$user"
 
 #install prerequisites
 apt-get update
-apt-get install -y m4 libsystemd-dev python3-pip
+apt-get install -y m4 libsystemd-dev python3-pip python3-gpiozero
 
 # create directory in /opt with correct permissions
 mkdir -p ${install_dir}
