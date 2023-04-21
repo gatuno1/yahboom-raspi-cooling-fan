@@ -71,11 +71,11 @@ try:
         i2c.write_byte_data(DEVICE_ADDRESS, REGISTER_ADDRESS, 0x00)
         i2c.close()
 except Exception as e:
-    msg = "Cannot open bus {}, i2c device at address '{}'! Aborting.\n".format(bus_number, hex(DEVICE_ADDRESS))
+    msg = "Cannot open i2c device at bus {}, address '{}'! Aborting.\n".format(bus_number, hex(DEVICE_ADDRESS))
     logger.critical(msg)
     raise RuntimeError(msg) from e
 else:
-    logger.info("Connected successfully to bus {}, i2c device at address '{}'.".format(bus_number, hex(DEVICE_ADDRESS)))
+    logger.info("Connected successfully to i2c device at bus {}, address '{}'.".format(bus_number, hex(DEVICE_ADDRESS)))
 
 logger.info("Initial temperature: {:.2f}°C".format(CPUTemperature().temperature))
 
