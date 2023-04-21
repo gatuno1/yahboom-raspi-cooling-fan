@@ -49,7 +49,10 @@ fi
 
 # check if service is enabled
 if ! systemctl is-enabled --quiet yahboom-fan-ctrl.service; then
+    systemctl daemon-reload
     systemctl enable yahboom-fan-ctrl.service
+else
+    systemctl daemon-reload
 fi
 
 # start service
