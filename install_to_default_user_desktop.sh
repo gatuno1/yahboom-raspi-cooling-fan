@@ -14,6 +14,10 @@ if [ "$(id -u)" = "0" ] || [ "$USER" != "$user" ]; then
     as_user="$user"
 fi
 
+#install prerequisites
+apt-get update
+apt-get install -y m4
+
 # get home of default user: UID 1000
 user_home=$(getent passwd 1000 | cut -d: -f6)
 
