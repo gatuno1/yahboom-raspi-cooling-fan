@@ -42,5 +42,15 @@ m4 -D __INSTALL_DIR__="${install_dir}" -D __USER__="${user}" \
 chmod 0644 /etc/systemd/system/yahboom-fan-ctrl.service
 chown root:root /etc/systemd/system/yahboom-fan-ctrl.service
 
-# enable service
-systemctl enable yahboom-fan-ctrl.service
+# check if service is active
+if systemctl is-active --quiet yahboom-fan-ctrl.service; then
+    systemctl stop yahboom-fan-ctrl.service
+fi
+
+# check if service is enabled
+if ! systemctl is-enabled --quiet yahboom-fan-ctrl.service; then
+    systemctl enable yahboom-fan-ctrl.service
+fi
+
+# start service
+systemctl start yahboom-fan-ctrl.service
