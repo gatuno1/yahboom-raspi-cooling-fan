@@ -36,23 +36,23 @@ touch "${install_dir}/yahboom-fan-ctrl.log"
 chmod 0664 "${install_dir}/yahboom-fan-ctrl.log"
 chown "$user": "${install_dir}/yahboom-fan-ctrl.log"
 
+# check if service is active
+if systemctl is-active --quiet yahboom-fan-ctrl.service; then
+    systemctl stop yahboom-fan-ctrl.service
+fi
+
 # create systemd service from m4 template
 m4 -D __INSTALL_DIR__="${install_dir}" -D __USER__="${user}" \
     yahboom-fan-ctrl.service.m4 > /etc/systemd/system/yahboom-fan-ctrl.service
 chmod 0644 /etc/systemd/system/yahboom-fan-ctrl.service
 chown root:root /etc/systemd/system/yahboom-fan-ctrl.service
 
-# check if service is active
-if systemctl is-active --quiet yahboom-fan-ctrl.service; then
-    systemctl stop yahboom-fan-ctrl.service
-fi
+# reload systemd after creating service
+systemctl daemon-reload
 
 # check if service is enabled
 if ! systemctl is-enabled --quiet yahboom-fan-ctrl.service; then
-    systemctl daemon-reload
     systemctl enable yahboom-fan-ctrl.service
-else
-    systemctl daemon-reload
 fi
 
 # start service
