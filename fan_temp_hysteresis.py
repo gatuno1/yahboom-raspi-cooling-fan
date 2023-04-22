@@ -89,7 +89,7 @@ while True:
     elif temperature <= trigger_temp - hysteresis_temp:
         fan_status = "OFF"
 
-    if fan_status != "NONE" and fan_status != last_fan_status:
+    if fan_status != "NONE": #and fan_status != last_fan_status:
         last_fan_status = fan_status
         set_fan(fan_status)
         logger.info('Temp: {:.2f}°C, Fan action: {}'.format(CPUTemperature().temperature, fan_status))
