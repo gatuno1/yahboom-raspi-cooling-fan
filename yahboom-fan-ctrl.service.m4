@@ -10,7 +10,7 @@ ExecStart=/usr/bin/python __INSTALL_DIR__/fan_temp_hysteresis.py
 WorkingDirectory=__INSTALL_DIR__
 Type=simple
 User=__USER__
-RestartPreventExitStatus=2 127
+RestartPreventExitStatus=1 127
 Restart=on-failure
 RestartSec=5s
 
