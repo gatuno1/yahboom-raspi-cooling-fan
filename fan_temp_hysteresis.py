@@ -1,7 +1,9 @@
 from gpiozero import CPUTemperature
 import smbus2
 import signal
+import sys
 from time import sleep
+from enum import Enum
 import logging
 from systemd import journal
 
@@ -9,6 +11,7 @@ DEVICE_ADDRESS = 0x0d
 REGISTER_ADDRESS = 0x08
 MODULE_NAME = "yahboom-fan-ctrl"
 
+# Configuration variables
 bus_number = 1
 hysteresis_temp : float = 10.0
 trigger_temp : float = 52.0
@@ -17,18 +20,36 @@ sleep_seconds = 2.0
 log_file = "./" + MODULE_NAME + ".log"
 verbose = 1
 
-temperature : float
-last_fan_status = ""
+class FanActions(Enum):
+    NONE = 0x00
+    OFF = 0x01
+    ON = 0x02
 
-def tidyup(signal, frame):
+# Global variables
+temperature : float
+fan_action : FanActions
+
+def signal_name(signum):
+    try:
+        if sys.version_info[:2] >= (3, 5):
+            return signal.Signals(signum).name
+        else:
+            return _signames[signum]
+    except KeyError:
+        return 'SIG_UNKNOWN'
+    except ValueError:
+        return 'SIG_UNKNOWN'
+
+def tidyup(signal_num: int, frame):
+    signal_name = signal_name(signal_num)
     logger.info("Caught terminate signal '{}'. Turn fan off.\n".format(signal))
-    set_fan("OFF")
+    set_fan(FanActions.OFF)
     exit(0)
 
-def set_fan(state: str):
+def set_fan(action: FanActions):
     success = False
     attempt = 1
-    value = 0x01 if state == "ON" else 0x00
+    value = 0x01 if action == FanActions.ON else 0x00
     while not success and attempt <= max_attempts:
         try:
             with smbus2.SMBus(bus_number) as i2c:
@@ -81,18 +102,17 @@ logger.info("Initial temperature: {:.2f}°C".format(CPUTemperature().temperature
 
 #Main loop
 while True:
-    fan_status = "NONE"
+    fan_action = FanActions.NONE
     temperature = CPUTemperature().temperature
 
     if temperature >= trigger_temp:
-        fan_status = "ON"
+        fan_action = FanActions.ON
     elif temperature <= trigger_temp - hysteresis_temp:
-        fan_status = "OFF"
+        fan_action = FanActions.OFF
 
-    if fan_status != "NONE": #and fan_status != last_fan_status:
-        last_fan_status = fan_status
-        set_fan(fan_status)
-        logger.info('Temp: {:.2f}°C, Fan action: {}'.format(CPUTemperature().temperature, fan_status))
+    if fan_action != FanActions.NONE:
+        set_fan(fan_action)
+        logger.info('Temp: {:.2f}°C, Fan action: {}'.format(CPUTemperature().temperature, fan_action))
     elif verbose >= 2:
         logger.debug('Temp: {:.2f}°C'.format(CPUTemperature().temperature))
 
