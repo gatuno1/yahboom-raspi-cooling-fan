@@ -122,7 +122,7 @@ while True:
 
     if fan_action != FanActions.NONE:
         set_fan(fan_action)
-        logger.info('Temp: {:.2f}°C, Fan action: {}'.format(CPUTemperature().temperature, fan_action))
+        logger.info('Temp: {:.2f}°C, Fan action: {}'.format(CPUTemperature().temperature, fan_action.name))
     elif verbose >= 2:
         logger.debug('Temp: {:.2f}°C'.format(CPUTemperature().temperature))
 
