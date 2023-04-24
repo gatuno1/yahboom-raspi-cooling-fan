@@ -1,4 +1,3 @@
-from gpiozero import CPUTemperature
 import smbus2
 import signal
 import sys
@@ -7,8 +6,8 @@ from enum import Enum
 import logging
 from systemd.journal import JournalHandler
 
-DEVICE_ADDRESS = 0x0d
-REGISTER_ADDRESS = 0x08
+DEVICE_ADDR = 0x0d
+FAN_REGISTER_ADDR = 0x08
 MODULE_NAME = "yahboom-fan-ctrl"
 
 # Configuration variables
@@ -32,12 +31,20 @@ fan_action : FanActions
 
 # Reference to get name: https://stackoverflow.com/a/35996948/17892898
 # signal.Signals(signum) requires python 3.5 or higher
-def signal_name(signum: int):
+def signal_name(signum: int) -> str:
+    """Get signal name from signal number.
+
+    Args:
+        signum (int): signal number
+
+    Returns:
+        str: Code name of signal
+    """
     try:
         if sys.version_info >= (3, 8):
-            return signal.strsignal(signal.Signals(signum))
+            return "{} - {}".format(signal.Signals(signum).name, signal.strsignal(signal.Signals(signum)))
         else:
-            sig = signal.Signals(signum)
+            sig = signal.Signals(signum).name
             return sig.name
     except KeyError:
         return 'SIG_UNKNOWN'
@@ -49,7 +56,38 @@ def tidyup(signal_num: int, frame):
     set_fan(FanActions.OFF)
     exit(0)
 
+def get_cpu_temp() -> float:
+    """Get CPU temperature.
+
+    Returns:
+        float: CPU temperature in Celsius
+    """
+    CPU_TEMP_FILE = "/sys/class/thermal/thermal_zone0/temp"
+    temp: float = -173.15
+    try:
+        with open(CPU_TEMP_FILE, 'r') as f:
+            temp_str = f.readline()
+            temp = float(temp_str.strip()) / 1000.0
+    except FileNotFoundError:
+        msg = "Error: Cannot find temperature file '{}'.".format(CPU_TEMP_FILE)
+        logger.critical(msg, exc_info=True)
+        exit(2)
+    except PermissionError:
+        msg = "Error: Permission denied to access temperature file '{}'.".format(CPU_TEMP_FILE)
+        logger.critical(msg, exc_info=True)
+        exit(2)
+    except:
+        msg = "Error: Unknown error reading temperature file '{}'.".format(CPU_TEMP_FILE)
+        logger.critical(msg, exc_info=True)
+        exit(2)
+    return temp
+
 def set_fan(action: FanActions):
+    """Activate/deactivate fan, calling i2c write function.
+
+    Args:
+        action (FanActions): Requested action
+    """
     success = False
     attempt = 1
     value = 0x01 if action == FanActions.ON else 0x00
@@ -57,8 +95,7 @@ def set_fan(action: FanActions):
         try:
             with smbus2.SMBus(bus_number) as i2c:
                 i2c.enable_pec(True)
-                i2c.write_byte_data(DEVICE_ADDRESS, REGISTER_ADDRESS, value)
-                i2c.close()
+                i2c.write_byte_data(DEVICE_ADDR, FAN_REGISTER_ADDR, value)
         except:
             if attempt <= max_attempts:
                 attempt += 1
@@ -67,7 +104,7 @@ def set_fan(action: FanActions):
             else:
                 msg = "Cannot write to i2c device after {} attempts.".format(attempt)
                 logger.critical(msg, exc_info=True)
-                exit(2)
+                exit(3)
         else:
             success = True
 
@@ -90,7 +127,7 @@ logger.addHandler(fh)
 
 # Check python version on runtime
 if sys.version_info < (3, 5):
-    msg = "Python version must be 3.5 or higher.\n"
+    msg = "Python version must be 3.5 or higher to run this program.\n"
     logger.critical(msg)
     exit(127)
 
@@ -99,21 +136,21 @@ logger.info("Starting {} log.".format(MODULE_NAME))
 try:
     with smbus2.SMBus(bus_number) as i2c:
         i2c.enable_pec(True)
-        i2c.write_byte_data(DEVICE_ADDRESS, REGISTER_ADDRESS, 0x00)
+        i2c.write_byte_data(DEVICE_ADDR, FAN_REGISTER_ADDR, 0x00)
         i2c.close()
 except Exception as e:
-    msg = "Cannot open i2c device at bus {}, address '{}'! Aborting.\n".format(bus_number, hex(DEVICE_ADDRESS))
+    msg = "Cannot open i2c device at bus {}, address '{}'! Aborting.\n".format(bus_number, hex(DEVICE_ADDR))
     logger.critical(msg)
     raise RuntimeError(msg) from e
 else:
-    logger.info("Connected successfully to i2c device at bus {}, address '{}'.".format(bus_number, hex(DEVICE_ADDRESS)))
+    logger.info("Connected successfully to i2c device at bus {}, address '{}'.".format(bus_number, hex(DEVICE_ADDR)))
 
 logger.info("Initial Temp: {:.2f}°C, trigger temp: {:.2f}°C, hys. temp: {:.2f}°C ".format(CPUTemperature().temperature, trigger_temp, -hysteresis_temp))
 
 #Main loop
 while True:
     fan_action = FanActions.NONE
-    temperature = CPUTemperature().temperature
+    temperature = get_cpu_temp()
 
     if temperature >= trigger_temp:
         fan_action = FanActions.ON
@@ -122,9 +159,9 @@ while True:
 
     if fan_action != FanActions.NONE:
         set_fan(fan_action)
-        logger.info('Temp: {:.2f}°C, Fan action: {}'.format(CPUTemperature().temperature, fan_action.name))
+        logger.info('Temp: {:.2f}°C, Fan action: {}'.format(temperature, fan_action.name))
     elif verbose >= 2:
-        logger.debug('Temp: {:.2f}°C'.format(CPUTemperature().temperature))
+        logger.debug('Temp: {:.2f}°C'.format(temperature))
 
     sleep(sleep_seconds)
 
