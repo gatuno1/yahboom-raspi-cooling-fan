@@ -145,7 +145,7 @@ except Exception as e:
 else:
     logger.info("Connected successfully to i2c device at bus {}, address '{}'.".format(bus_number, hex(DEVICE_ADDR)))
 
-logger.info("Initial Temp: {:.2f}°C, trigger temp: {:.2f}°C, hys. temp: {:.2f}°C ".format(CPUTemperature().temperature, trigger_temp, -hysteresis_temp))
+logger.info("Initial Temp: {:.2f}°C, trigger temp: {:.2f}°C, hys. temp: {:.2f}°C ".format(get_cpu_temp(), trigger_temp, -hysteresis_temp))
 
 #Main loop
 while True:
