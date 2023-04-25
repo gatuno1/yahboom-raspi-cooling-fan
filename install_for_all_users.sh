@@ -1,6 +1,9 @@
 #!/bin/sh
 # Install for all users in `/opt`
 
+# variables
+install_dir='/opt/yahboom-raspi-cooling-fan'
+
 # check if terminal supports output colors
 if which tput >/dev/null 2>&1 && [ "$(tput -T"$TERM" colors)" -ge 8 ]; then
    fmtBold="\e[1m"
@@ -12,9 +15,6 @@ if [ "$(id -u)" != "0" ]; then
     echo "${fmtBold}Error: this script must be run with sudo or as root.${fmtReset}"
     exit 1
 fi
-
-# variables
-install_dir='/opt/yahboom-raspi-cooling-fan'
 
 # get user for UID 1000, normally 'pi'
 user=$(getent passwd 1000 | cut -d: -f1)
@@ -28,7 +28,7 @@ echo "${fmtBold}Added user '$user' to groups 'i2c' & 'gpio'.${fmtReset}"
 #install prerequisites
 echo "${fmtBold}Installing prerequisites...${fmtReset}"
 apt-get update
-apt-get install -y m4 libsystemd-dev python3-pip python3-gpiozero
+apt-get install -y m4 libsystemd-dev python3-pip
 echo "${fmtBold}Prerequisites installed.${fmtReset}"
 
 # create directory in /opt with correct permissions
