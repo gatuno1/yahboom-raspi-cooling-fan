@@ -232,7 +232,7 @@ def setup_logging(log_file: str, verbose_level: int) -> logging.Logger:
     new_logger.addHandler(fh)
     return new_logger
 
-def init_communication():
+def init_communication(logger: logging.Logger):
     """Initialize communication with i2c device, also writing to log.
        If communication fails, exit with error code 2.
     """
@@ -249,7 +249,7 @@ def init_communication():
     else:
         logger.info("Connected successfully to i2c device at bus {}, address '{}'.".format(bus_number, hex(DEVICE_ADDR)))
 
-    logger.info("Initial Temp: {:.2f}°C, trigger temp: {:.2f}°C, hys. temp: >={:.2f}°C ".format(get_cpu_temp(), trigger_temp, -hysteresis_temp))
+    logger.info("Initial Temp: {:.2f}°C, trigger temp: >={:.2f}°C, hys. temp: {:.2f}°C ".format(get_cpu_temp(), trigger_temp, -hysteresis_temp))
 
 
 def main():
@@ -274,7 +274,7 @@ def main():
     signal.signal(signal.SIGTERM, tidyup)
 
     #Init
-    init_communication()
+    init_communication(logger)
 
     #Main loop
     while True:
