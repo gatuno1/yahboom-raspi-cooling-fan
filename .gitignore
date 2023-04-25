@@ -139,6 +139,7 @@ cython_debug/
 
 # VSCode
 .vscode/
+.vs/
 
 # PyCharm
 .idea/
