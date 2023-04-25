@@ -137,6 +137,7 @@ def set_fan(action: FanActions):
 def read_config():
     """Read configuration from file or command line arguments.
     """
+    global bus_number, log_file, verbose, hysteresis_temp, trigger_temp, max_attempts, sleep_seconds
     # Read configuration from file
     config = configparser.ConfigParser()
 
