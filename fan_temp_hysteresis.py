@@ -72,6 +72,7 @@ def signal_name(signum: int) -> str:
     except ValueError:
         return 'SIG_UNKNOWN'
 
+
 def tidyup(signal_num: int, frame):
     """Write to log, turn off fan and exit program.
 
@@ -81,6 +82,7 @@ def tidyup(signal_num: int, frame):
     logger.info("Caught terminate signal '{}'. Turn fan off.\n".format(signal_name(signal_num)))
     set_fan(FanActions.OFF)
     exit(0)
+
 
 def get_cpu_temp() -> float:
     """Get CPU temperature.
@@ -108,6 +110,7 @@ def get_cpu_temp() -> float:
         exit(3)
     return temp
 
+
 def set_fan(action: FanActions):
     """Activate/deactivate fan, calling i2c write function.
 
@@ -134,6 +137,7 @@ def set_fan(action: FanActions):
         else:
             success = True
 
+
 def read_config():
     """Read configuration from file or command line arguments.
     """
@@ -159,56 +163,6 @@ def read_config():
     sleep_seconds = config.getfloat('FAN-CTRL', 'sleep_seconds', fallback=sleep_seconds)
 
 
-# # Read configuration from command line arguments
-# parser = argparse.ArgumentParser(prog="MODULE_NAME", description="Yahboom fan control program")
-# parser.add_argument("-b", "--bus_number", type=int, metavar="BUS_NUMBER",
-#     dest="bus_number", help="I2C bus number (default: %(default)s)")
-# parser.add_argument("-y", "--hysteresis_temp", type=float, metavar="HYSTERESIS_TEMP",
-#     dest="hysteresis_temp", help="Hysteresis  (in degrees Celsius) (default: %(default)s)")
-# parser.add_argument("-t", "--trigger_temp", type=float, metavar="TRIGGER_TEMP", dest="trigger_temp",
-#     help="Temperature threshold to turn on the fan (in degrees Celsius) (default: %(default)s)")
-# parser.add_argument("--max_attempts", type=int, metavar="MAX_ATTEMPTS", dest="max_attempts",
-#     help="Maximum number of attempts to read temperature sensor (default: %(default)s)")
-# parser.add_argument("-s", "--sleep_seconds", type=float, metavar="SLEEP_SECONDS", dest="sleep_seconds",
-#     help="Time to wait between attempts to read temperature sensor (in seconds) (default: %(default)s)")
-# parser.add_argument("-l", "--log_file", type=str, metavar="LOG_FILE", dest="log_file",
-#     help="Path to log file (default: %(default)s)")
-# parser.add_argument("-v", "--verbose", type=int, choices=[0, 1, 2], metavar="VERBOSITY_LEVEL",
-#     dest="verbose",help="Verbosity level (0 = no output, 1 = info output, 2 = debug output) (default: %(default)s)")
-# args = parser.parse_args()
-
-# # Update configuration variables with command line arguments
-# try:
-#     if args.bus_number:
-#         bus_number = args.bus_number
-#     if args.hysteresis_temp:
-#         hysteresis_temp = args.hysteresis_temp
-#     if args.trigger_temp:
-#         trigger_temp = args.trigger_temp
-#     if args.max_attempts:
-#         max_attempts = args.max_attempts
-#     if args.sleep_seconds:
-#         sleep_seconds = args.sleep_seconds
-#     if args.log_file:
-#         log_file = args.log_file
-#     if args.verbose:
-#         verbose = args.verbose
-# except argparse.ArgumentError as exc:
-#     print(exc)
-#     parser.print_usage()
-
-# # Check for invalid command line arguments
-# invalid_args = []
-# for arg in vars(args):
-#     value = getattr(args, arg)
-#     if value is None:
-#         invalid_args.append(arg)
-
-# if invalid_args:
-#     print(f"Error: Invalid argument(s): {', '.join(invalid_args)}")
-#     parser.print_usage()
-
-
 def setup_logging(log_file: str, verbose_level: int) -> logging.Logger:
     """Setup of Log management, to file and journalctl.
 
@@ -231,6 +185,7 @@ def setup_logging(log_file: str, verbose_level: int) -> logging.Logger:
     fh.setFormatter(formatter)
     new_logger.addHandler(fh)
     return new_logger
+
 
 def init_communication(logger: logging.Logger):
     """Initialize communication with i2c device, also writing to log.
@@ -297,5 +252,5 @@ def main():
 if __name__ == "__main__":
     main()
 
-#OFF: sudo i2cset -y 1 0x0d 0x08 0x00
-#ON:  sudo i2cset -y 1 0x0d 0x08 0x01
+#Manual OFF: sudo i2cset -y 1 0x0d 0x08 0x00
+#Manual  ON:  sudo i2cset -y 1 0x0d 0x08 0x01
