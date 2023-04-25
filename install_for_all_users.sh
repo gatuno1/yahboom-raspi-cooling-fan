@@ -46,7 +46,8 @@ echo "Created log file: '${install_dir}/yahboom-fan-ctrl.log'."
 
 # check if service is active
 if systemctl is-active --quiet yahboom-fan-ctrl.service; then
-    SYSTEMD_LOG_LEVEL=debug systemctl stop yahboom-fan-ctrl.service 2>&1 | grep -E -i 'error|fail|warn|result'
+    echo "Stopping service..."
+    SYSTEMD_LOG_LEVEL=debug systemctl stop yahboom-fan-ctrl.service 2>&1 | grep -E -i 'Got result|Failed'
 fi
 
 # create systemd service from m4 template
@@ -60,11 +61,13 @@ systemctl daemon-reload
 
 # check if service is enabled
 if ! systemctl is-enabled --quiet yahboom-fan-ctrl.service; then
-    systemctl enable yahboom-fan-ctrl.service
+    echo "Enabling service..."
+    SYSTEMD_LOG_LEVEL=debug systemctl enable yahboom-fan-ctrl.service 2>&1 | grep -E -i 'Got result|Failed'
 fi
 
 # start service
-SYSTEMD_LOG_LEVEL=debug systemctl start yahboom-fan-ctrl.service 2>&1 | grep -E -i 'error|fail|warn|result'
+echo "Starting service..."
+SYSTEMD_LOG_LEVEL=debug systemctl start yahboom-fan-ctrl.service 2>&1 | grep -E -i 'Got result|Failed'
 
 # final message
 echo "Installation complete."
