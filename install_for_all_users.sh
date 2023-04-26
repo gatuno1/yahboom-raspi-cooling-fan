@@ -51,6 +51,7 @@ chown "$user": "${install_dir}/yahboom-fan-ctrl.log"
 echo "${fmtBold}Created log file: '${install_dir}/yahboom-fan-ctrl.log'.${fmtReset}"
 
 # check if service is active
+# Reference on status output of `systemctl`: https://stackoverflow.com/a/73207052/17892898
 if systemctl is-active --quiet yahboom-fan-ctrl.service; then
     echo "${fmtBold}Stopping service...${fmtReset}"
     SYSTEMD_LOG_LEVEL=debug systemctl stop yahboom-fan-ctrl.service 2>&1 | grep -E 'Got result|Failed'
