@@ -137,7 +137,7 @@ def setup_logging(verbose_level: int, log_file: str) -> logging.Logger:
     new_logger = logging.getLogger(MODULE_NAME)
     jh = JournalHandler(SYSLOG_IDENTIFIER=MODULE_NAME)
     jh.setLevel(logging.INFO if verbose_level < 2 else logging.DEBUG)
-    new_logger.addHandler(JournalHandler(jh))
+    new_logger.addHandler(jh)
     new_logger.setLevel(logging.DEBUG)
     # Reference for multiple handlers: https://docs.python.org/3.9/howto/logging-cookbook.html?highlight=logger#multiple-handlers-and-formatters
     # Reference for log to file: https://stackoverflow.com/questions/6386698/how-to-write-to-a-file-using-the-logging-python-module
