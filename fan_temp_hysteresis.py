@@ -9,6 +9,7 @@ import os
 from time import sleep
 from enum import Enum
 import logging
+import logging.handlers
 from systemd.journal import JournalHandler
 
 # Constants
@@ -30,10 +31,14 @@ ERR_LOG_FILE = 5
 # Configuration global variables
 bus_number: int = 1  # raspberry pi with 256MB uses bus_number = 0
 """i2c bus number."""
-log_file: str = "./" + MODULE_NAME + ".log"
+log_file: str = "/var/log/" + MODULE_NAME + ".log"
 """Log file path."""
 verbose: int = 1
 """Verbosity level of messages."""
+max_log_size: int = 100*1024
+"""Maximum size of log file, in bytes."""
+max_log_backups: int = 3
+"""Maximum number of log file backups."""
 
 hysteresis_temp: float = 10.0
 """Temperature hysteresis to turn off fan, in Celsius."""
@@ -57,8 +62,6 @@ class FanActions(Enum):
 
 
 def signal_name(signum: int) -> str:
-    # Reference to get name: https://stackoverflow.com/a/35996948/17892898
-    # Note: Method signal.Signals(signum) requires python 3.5 or higher.
     """Get signal name from signal value.
 
     Args:
@@ -67,6 +70,8 @@ def signal_name(signum: int) -> str:
     Returns:
         str: Code name of signal
     """
+    # Reference to get name: https://stackoverflow.com/a/35996948/17892898
+    # Note: Method signal.Signals(signum) requires python 3.5 or higher.
     try:
         if sys.version_info >= (3, 8):
             return f"{signal.Signals(signum).name} - {signal.strsignal(signal.Signals(signum))}"
@@ -82,14 +87,15 @@ def signal_name(signum: int) -> str:
 def read_config():
     """Read configuration from file or command line arguments.
     """
-    global bus_number, log_file, verbose, hysteresis_temp, trigger_temp, max_attempts, sleep_seconds
+    global bus_number, log_file, verbose, max_log_size, max_log_backups
+    global hysteresis_temp, trigger_temp, max_attempts, sleep_seconds
     # Read configuration from file
     config = configparser.ConfigParser()
 
     # Search for config file in /etc/yahboom-fan-ctrl/ and ./ directories
     config_file_paths = [
-        "/etc/{}/{}.conf".format(MODULE_NAME, MODULE_NAME),
-        "./{}.conf".format(MODULE_NAME)]
+        f"/etc/{MODULE_NAME}/{MODULE_NAME}.conf",
+        f"./{MODULE_NAME}.conf"]
     for config_file_path in config_file_paths:
         if os.path.exists(config_file_path):
             config.read(config_file_path)
@@ -99,6 +105,10 @@ def read_config():
     bus_number = config.getint('DEFAULT', 'bus_number', fallback=bus_number)
     log_file = config.get('DEFAULT', 'log_file', fallback=log_file)
     verbose = config.getint('DEFAULT', 'verbose', fallback=verbose)
+    max_log_size = config.getint(
+        'DEFAULT', 'max_log_size', fallback=max_log_size)
+    max_log_backups = config.getint(
+        'DEFAULT', 'max_log_backups', fallback=max_log_backups)
 
     hysteresis_temp = config.getfloat(
         'FAN-CTRL', 'hysteresis_temp', fallback=hysteresis_temp)
@@ -123,16 +133,45 @@ def setup_logging(verbose_level: int, log_file: str) -> logging.Logger:
     #
     # Reference: https://docs.python.org/3.9/howto/logging.html
     new_logger = logging.getLogger(MODULE_NAME)
-    new_logger.addHandler(JournalHandler(SYSLOG_IDENTIFIER=MODULE_NAME))
-    new_logger.setLevel(logging.INFO if verbose_level < 2 else logging.DEBUG)
+    jh = JournalHandler(SYSLOG_IDENTIFIER=MODULE_NAME)
+    jh.setLevel(logging.INFO if verbose_level < 2 else logging.DEBUG)
+    new_logger.addHandler(JournalHandler(jh))
+    new_logger.setLevel(logging.DEBUG)
     # Reference for multiple handlers: https://docs.python.org/3.9/howto/logging-cookbook.html?highlight=logger#multiple-handlers-and-formatters
     # Reference for log to file: https://stackoverflow.com/questions/6386698/how-to-write-to-a-file-using-the-logging-python-module
-    fh = logging.FileHandler(log_file, encoding='utf-8')
-    fh.setLevel(logging.DEBUG)
-    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-    fh.setFormatter(formatter)
-    new_logger.addHandler(fh)
+    if max_log_size > 256:
+        fh = logging.handlers.RotatingFileHandler(
+            log_file, encoding='utf-8', maxBytes=max_log_size, backupCount=max_log_backups)
+        fh.setLevel(logging.DEBUG)
+        formatter = logging.Formatter(
+            '%(asctime)s - %(levelname)s - %(message)s')
+        fh.setFormatter(formatter)
+        new_logger.addHandler(fh)
     return new_logger
+
+
+def assure_log():
+    """Check if log file and directory exists, if not create them.
+    """
+    global log_file, max_log_size, max_log_backups
+    # check non empty file name
+    if len(log_file) == 0:
+        print("Error: log file cannot be empty. Aborting.", file=sys.stderr)
+        exit(ERR_LOG_FILE)
+    # get path to log file, if not create the directory and file
+    try:
+        os.makedirs(os.path.dirname(log_file), exist_ok=True)
+    except OSError:
+        print(
+            f"Error: Cannot create directory for log file '{log_file}'.", file=sys.stderr)
+        exit(ERR_LOG_FILE)
+    # create log file if not exists, with user permissions
+    try:
+        with open(log_file, 'a'):
+            os.utime(log_file, None)
+    except OSError:
+        print(f"Error: Cannot create log file '{log_file}'.", file=sys.stderr)
+        exit(ERR_LOG_FILE)
 
 
 def main():
@@ -238,9 +277,7 @@ def main():
 
     # Read configuration from file(s), affecting global configuration variables
     read_config()
-    if len(log_file) == 0:
-        print("Error: log file cannot be empty. Aborting.", file=sys.stderr)
-        exit(ERR_LOG_FILE)
+    assure_log()
 
     # Log management
     common_logger = setup_logging(verbose, log_file)

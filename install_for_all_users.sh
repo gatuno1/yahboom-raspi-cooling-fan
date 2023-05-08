@@ -1,13 +1,15 @@
 #!/bin/sh
-# Install for all users in `/opt`
+# Install yahboom-fan-ctrl for all users in `/opt`
 
 # variables
-install_dir='/opt/yahboom-raspi-cooling-fan'
+module_name='yahboom-raspi-cooling-fan'
+install_dir="/opt/${module_name}"
+log_dir="/var/log/${module_name}"
 
 # check if terminal supports output colors
 if which tput >/dev/null 2>&1 && [ "$(tput -T"$TERM" colors)" -ge 8 ]; then
-   fmtBold="\e[1m"
-   fmtReset="\e[0m"
+    fmtBold="\e[1m"
+    fmtReset="\e[0m"
 fi
 
 # check if running as root
@@ -46,21 +48,24 @@ chown "$user": "${install_dir}/fan_temp_hysteresis.py" yahboom-fan-ctrl.conf
 echo "${fmtBold}Copied files to '${install_dir}'.${fmtReset}"
 
 # create log file
-touch "${install_dir}/yahboom-fan-ctrl.log"
-chmod 0664 "${install_dir}/yahboom-fan-ctrl.log"
-chown "$user": "${install_dir}/yahboom-fan-ctrl.log"
-echo "${fmtBold}Created log file: '${install_dir}/yahboom-fan-ctrl.log'.${fmtReset}"
+mkdir -p "${log_dir}"
+chmod 0775 "${log_dir}"
+chown "$user": "${log_dir}"
+touch "${log_dir}/yahboom-fan-ctrl.log"
+chmod 0664 "${log_dir}/yahboom-fan-ctrl.log"
+chown "$user": "${log_dir}/yahboom-fan-ctrl.log"
+echo "${fmtBold}Created log file: '${log_dir}/yahboom-fan-ctrl.log'.${fmtReset}"
 
 # check if service is active
 # Reference on status output of `systemctl`: https://stackoverflow.com/a/73207052/17892898
 if systemctl is-active --quiet yahboom-fan-ctrl.service; then
     echo "${fmtBold}Stopping service...${fmtReset}"
-    SYSTEMD_LOG_LEVEL=debug systemctl stop yahboom-fan-ctrl.service 2>&1 | grep -E 'Got result|Failed'
+    LANGUAGE="C.UTF-8" SYSTEMD_LOG_LEVEL=debug systemctl stop yahboom-fan-ctrl.service 2>&1 | grep -E 'Got result|Failed'
 fi
 
 # create systemd service from m4 template
 m4 -D __INSTALL_DIR__="${install_dir}" -D __USER__="${user}" \
-    yahboom-fan-ctrl.service.m4 > /etc/systemd/system/yahboom-fan-ctrl.service
+    yahboom-fan-ctrl.service.m4 >/etc/systemd/system/yahboom-fan-ctrl.service
 chmod 0644 /etc/systemd/system/yahboom-fan-ctrl.service
 chown root:root /etc/systemd/system/yahboom-fan-ctrl.service
 echo "${fmtBold}Created systemd service.${fmtReset}"
@@ -70,12 +75,12 @@ systemctl daemon-reload
 # check if service is enabled
 if ! systemctl is-enabled --quiet yahboom-fan-ctrl.service; then
     echo "${fmtBold}Enabling service...${fmtReset}"
-    SYSTEMD_LOG_LEVEL=debug systemctl enable yahboom-fan-ctrl.service 2>&1 | grep -E 'Got result|Failed'
+    LANGUAGE="C.UTF-8" SYSTEMD_LOG_LEVEL=debug systemctl enable yahboom-fan-ctrl.service 2>&1 | grep -E 'Got result|Failed'
 fi
 
 # start service
 echo "${fmtBold}Starting service...${fmtReset}"
-SYSTEMD_LOG_LEVEL=debug systemctl start yahboom-fan-ctrl.service 2>&1 | grep -E 'Got result|Failed'
+LANGUAGE="C.UTF-8" SYSTEMD_LOG_LEVEL=debug systemctl start yahboom-fan-ctrl.service 2>&1 | grep -E 'Got result|Failed'
 
 # final message
 echo "${fmtBold}Installation complete on '$install_dir'.${fmtReset}"
