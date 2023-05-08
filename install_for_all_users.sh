@@ -29,6 +29,7 @@ echo "${fmtBold}Added user '$user' to groups 'i2c' & 'gpio'.${fmtReset}"
 echo "${fmtBold}Installing prerequisites...${fmtReset}"
 apt-get update
 apt-get install -y m4 libsystemd-dev python3-pip
+pip3 install systemd-python
 echo "${fmtBold}Prerequisites installed.${fmtReset}"
 
 # create directory in /opt with correct permissions

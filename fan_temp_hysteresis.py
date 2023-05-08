@@ -215,7 +215,7 @@ def setup_logging(log_file: str, verbose_level: int) -> logging.Logger:
     #
     # Reference: https://docs.python.org/3.9/howto/logging.html
     new_logger = logging.getLogger(MODULE_NAME)
-    new_logger.addHandler(JournalHandler())
+    new_logger.addHandler(JournalHandler(SYSLOG_IDENTIFIER=MODULE_NAME))
     new_logger.setLevel(logging.DEBUG if verbose_level >= 2 else logging.INFO)
     # Reference for log to file: https://stackoverflow.com/questions/6386698/how-to-write-to-a-file-using-the-logging-python-module
     fh = logging.FileHandler(log_file)
