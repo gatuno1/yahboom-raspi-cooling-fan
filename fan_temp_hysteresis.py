@@ -46,36 +46,6 @@ class FanActions(Enum):
     """Turn fan on."""
 
 
-# Global variables
-temperature: float
-"""Current CPU temperature in Celsius."""
-fan_action: FanActions
-"""Action to be taken by fan."""
-logger: logging.Logger
-"""Logger object to write to log file and stdout."""
-
-
-def init_communication(logger: logging.Logger):
-    """Initialize communication with i2c device, also writing to log.
-       If communication fails, exit with error code 2.
-    """
-    logger.info(f"Starting {MODULE_NAME} log.")
-
-    try:
-        with smbus2.SMBus(bus_number) as i2c:
-            i2c.enable_pec(True)  # Enable "Packet Error Checking"
-            # Stop fan
-            i2c.write_byte_data(DEVICE_ADDR, FAN_SPEED_REG, 0x00)
-    except Exception as e:
-        msg = f"Cannot open i2c device at bus {bus_number}, address '{hex(DEVICE_ADDR)}'! Aborting.\n"
-        logger.critical(msg, exc_info=True)
-        exit(2)
-    else:
-        logger.info(f"Connected successfully to i2c device at bus {bus_number}, address '{hex(DEVICE_ADDR)}'.")
-
-    logger.info(f"Initial Temp: {get_cpu_temp():.2f}°C, trigger temp: >={trigger_temp:.2f}°C, hys. temp: {-hysteresis_temp:.2f}°C ")
-
-
 def signal_name(signum: int) -> str:
     # Reference to get name: https://stackoverflow.com/a/35996948/17892898
     # Note: Method signal.Signals(signum) requires python 3.5 or higher.
@@ -97,73 +67,6 @@ def signal_name(signum: int) -> str:
         return 'SIG_UNKNOWN'
     except ValueError:
         return 'SIG_UNKNOWN'
-
-
-def tidyup(signal_num: int, frame):
-    global logger
-    """Exit the program, after writing to log and turning off fan.
-
-    Args:
-        signal_num (int): signal value
-    """
-    logger.info(f"Caught terminate signal '{signal_name(signal_num)}'. Turn fan off.\n")
-    set_fan(FanActions.OFF)
-    exit(0)
-
-
-def get_cpu_temp() -> float:
-    """Get CPU temperature.
-
-    Returns:
-        float: CPU temperature in Celsius
-    """
-    CPU_TEMP_FILE = "/sys/class/thermal/thermal_zone0/temp"
-    temp: float = -173.15
-    try:
-        with open(CPU_TEMP_FILE, 'r') as f:
-            temp_str = f.readline()
-            temp = float(temp_str.strip()) / 1000.0
-    except FileNotFoundError:
-        msg = f"Error: Cannot find temperature file '{CPU_TEMP_FILE}'."
-        logger.critical(msg, exc_info=True)
-        exit(3)
-    except PermissionError:
-        msg = f"Error: Permission denied to access temperature file '{CPU_TEMP_FILE}'."
-        logger.critical(msg, exc_info=True)
-        exit(3)
-    except:
-        msg = f"Error: Unknown error reading temperature file '{CPU_TEMP_FILE}'."
-        logger.critical(msg, exc_info=True)
-        exit(3)
-    return temp
-
-
-def set_fan(action: FanActions):
-    """Activate/deactivate fan, calling i2c write function.
-
-    Args:
-        action (FanActions): Requested action
-    """
-    success = False
-    attempt = 1
-    # 0x1 = 100% fan speed, 0x0 = 0% fan speed
-    value = 0x01 if action == FanActions.ON else 0x00
-    while not success and attempt <= max_attempts:
-        try:
-            with smbus2.SMBus(bus_number) as bus:
-                bus.enable_pec(True)
-                bus.write_byte_data(DEVICE_ADDR, FAN_SPEED_REG, value)
-        except:
-            if attempt <= max_attempts:
-                attempt += 1
-                if verbose >= 2:
-                    logger.exception(f"Write i2c error, attempt {attempt}.", exc_info=True)
-            else:
-                msg = f"Cannot write to i2c device after {attempt} attempts."
-                logger.critical(msg, exc_info=True)
-                exit(2)
-        else:
-            success = True
 
 
 def read_config():
@@ -225,6 +128,102 @@ def main():
     """Main function of the program.
        If python version is not 3.5 or higher, exit with error code 127.
     """
+    # Variables
+    temperature: float
+    """Current CPU temperature in Celsius."""
+    fan_action: FanActions
+    """Action to be taken by fan."""
+    logger: logging.Logger
+    """Logger object to write to log file and stdout."""
+
+    def signal_handler(signal_num: int, frame):
+        """Exit the program, after writing to log and turning off fan.
+
+        Args:
+            signal_num (int): signal value
+            frame (frame object): current stack frame
+        """
+        logger.info(f"Caught terminate signal '{signal_name(signal_num)}'. Turn fan off.\n")
+        set_fan(FanActions.OFF)
+        exit(0)
+
+
+    def init_communication(logger: logging.Logger):
+        """Initialize communication with i2c device, also writing to log.
+        If communication fails, exit with error code 2.
+        """
+        logger.info(f"Starting {MODULE_NAME} log.")
+
+        try:
+            with smbus2.SMBus(bus_number) as i2c:
+                i2c.enable_pec(True)  # Enable "Packet Error Checking"
+                # Stop fan
+                i2c.write_byte_data(DEVICE_ADDR, FAN_SPEED_REG, 0x00)
+        except Exception as e:
+            msg = f"Cannot open i2c device at bus {bus_number}, address '{hex(DEVICE_ADDR)}'! Aborting.\n"
+            logger.critical(msg, exc_info=True)
+            exit(2)
+        else:
+            logger.info(f"Connected successfully to i2c device at bus {bus_number}, address '{hex(DEVICE_ADDR)}'.")
+
+        logger.info(f"Initial Temp: {get_cpu_temp():.2f}°C, trigger temp: >={trigger_temp:.2f}°C, hys. temp: {-hysteresis_temp:.2f}°C ")
+
+
+    def get_cpu_temp() -> float:
+        """Get CPU temperature.
+
+        Returns:
+            float: CPU temperature in Celsius
+        """
+        CPU_TEMP_FILE = "/sys/class/thermal/thermal_zone0/temp"
+        temp: float = -173.15
+        try:
+            with open(CPU_TEMP_FILE, 'r') as f:
+                temp_str = f.readline()
+                temp = float(temp_str.strip()) / 1000.0
+        except FileNotFoundError:
+            msg = f"Error: Cannot find temperature file '{CPU_TEMP_FILE}'."
+            logger.critical(msg, exc_info=True)
+            exit(3)
+        except PermissionError:
+            msg = f"Error: Permission denied to access temperature file '{CPU_TEMP_FILE}'."
+            logger.critical(msg, exc_info=True)
+            exit(3)
+        except:
+            msg = f"Error: Unknown error reading temperature file '{CPU_TEMP_FILE}'."
+            logger.critical(msg, exc_info=True)
+            exit(3)
+        return temp
+
+
+    def set_fan(action: FanActions):
+        """Activate/deactivate fan, calling i2c write function.
+
+        Args:
+            action (FanActions): Requested action
+        """
+        success = False
+        attempt = 1
+        # 0x1 = 100% fan speed, 0x0 = 0% fan speed
+        value = 0x01 if action == FanActions.ON else 0x00
+        while not success and attempt <= max_attempts:
+            try:
+                with smbus2.SMBus(bus_number) as bus:
+                    bus.enable_pec(True)
+                    bus.write_byte_data(DEVICE_ADDR, FAN_SPEED_REG, value)
+            except:
+                if attempt <= max_attempts:
+                    attempt += 1
+                    if verbose >= 2:
+                        logger.exception(f"Write i2c error, attempt {attempt}.", exc_info=True)
+                else:
+                    msg = f"Cannot write to i2c device after {attempt} attempts."
+                    logger.critical(msg, exc_info=True)
+                    exit(2)
+            else:
+                success = True
+
+
     # Log management
     logger = setup_logging(log_file, verbose)
 
@@ -238,9 +237,9 @@ def main():
     read_config()
 
     # System signal management
-    signal.signal(signal.SIGINT, tidyup)
-    signal.signal(signal.SIGQUIT, tidyup)
-    signal.signal(signal.SIGTERM, tidyup)
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGQUIT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
 
     # Init
     init_communication(logger)
