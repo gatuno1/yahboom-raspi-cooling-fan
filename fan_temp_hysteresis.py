@@ -18,7 +18,7 @@ MODULE_NAME = "yahboom-fan-ctrl"
 """Module name used for configuration file and log file."""
 
 # Configuration global variables
-bus_number: int = 1  #raspberry pi with 256MB uses bus_number = 0
+bus_number: int = 1  # raspberry pi with 256MB uses bus_number = 0
 """i2c bus number."""
 log_file: str = "./" + MODULE_NAME + ".log"
 """Log file path."""
@@ -100,12 +100,12 @@ def read_config():
         'FAN-CTRL', 'sleep_seconds', fallback=sleep_seconds)
 
 
-def setup_logging(log_file: str, verbose_level: int) -> logging.Logger:
+def setup_logging(verbose_level: int, log_file=None) -> logging.Logger:
     """Setup of Log management, to file and journalctl.
 
     Args:
-        log_file (str): file path to log file
         verbose_level (int): verbosity level
+        log_file (str): file path to log file
 
     Returns:
         logging.Logger: logger object
@@ -113,14 +113,18 @@ def setup_logging(log_file: str, verbose_level: int) -> logging.Logger:
     #
     # Reference: https://docs.python.org/3.9/howto/logging.html
     new_logger = logging.getLogger(MODULE_NAME)
-    new_logger.addHandler(JournalHandler(SYSLOG_IDENTIFIER=MODULE_NAME))
-    new_logger.setLevel(logging.DEBUG if verbose_level >= 2 else logging.INFO)
-    # Reference for log to file: https://stackoverflow.com/questions/6386698/how-to-write-to-a-file-using-the-logging-python-module
-    fh = logging.FileHandler(log_file)
-    fh.setLevel(logging.DEBUG)
-    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-    fh.setFormatter(formatter)
-    new_logger.addHandler(fh)
+    if log_file is None:
+        new_logger.addHandler(JournalHandler(SYSLOG_IDENTIFIER=MODULE_NAME))
+        new_logger.setLevel(
+            logging.DEBUG if verbose_level >= 2 else logging.INFO)
+    else:
+        # Reference for log to file: https://stackoverflow.com/questions/6386698/how-to-write-to-a-file-using-the-logging-python-module
+        fh = logging.FileHandler(log_file)
+        fh.setLevel(logging.DEBUG if verbose_level >= 2 else logging.INFO)
+        formatter = logging.Formatter(
+            '%(asctime)s - %(levelname)s - %(message)s')
+        fh.setFormatter(formatter)
+        new_logger.addHandler(fh)
     return new_logger
 
 
@@ -135,8 +139,10 @@ def main():
     """Action to be taken by fan."""
     last_action: FanActions = FanActions.OFF
     """Last action taken by fan."""
-    logger: logging.Logger
-    """Logger object to write to log file and stdout."""
+    sys_logger: logging.Logger
+    """Logger object to write to journal."""
+    file_logger: logging.Logger
+    """Logger object to write to log file."""
 
     def signal_handler(signal_num: int, frame):
         """Exit the program, after writing to log and turning off fan.
@@ -145,17 +151,19 @@ def main():
             signal_num (int): signal value
             frame (frame object): current stack frame
         """
-        logger.info(f"Caught terminate signal '{signal_name(signal_num)}'. Turn fan off.\n")
+        message = f"Caught terminate signal '{signal_name(signal_num)}'. Turn fan off.\n"
+        sys_logger.info(message)
+        file_logger.info(message)
         set_fan(FanActions.OFF)
         exit(0)
 
-
-    def init_communication(logger: logging.Logger):
+    def init_communication():
         """Initialize communication with i2c device, also writing to log.
         If communication fails, exit with error code 2.
         """
-        logger.info(f"Starting {MODULE_NAME} log.")
-
+        message = f"Starting {MODULE_NAME} log."
+        sys_logger.info(message)
+        file_logger.info(message)
         try:
             with smbus2.SMBus(bus_number) as i2c:
                 i2c.enable_pec(True)  # Enable "Packet Error Checking"
@@ -163,13 +171,17 @@ def main():
                 i2c.write_byte_data(DEVICE_ADDR, FAN_SPEED_REG, 0x00)
         except Exception as e:
             msg = f"Cannot open i2c device at bus {bus_number}, address '{hex(DEVICE_ADDR)}'! Aborting.\n"
-            logger.critical(msg, exc_info=True)
+            sys_logger.critical(msg, exc_info=True)
+            file_logger.critical(msg, exc_info=True)
             exit(2)
         else:
-            logger.info(f"Connected successfully to i2c device at bus {bus_number}, address '{hex(DEVICE_ADDR)}'.")
+            message = f"Connected successfully to i2c device at bus {bus_number}, address '{hex(DEVICE_ADDR)}'."
+            sys_logger.info(message)
+            file_logger.info(message)
 
-        logger.info(f"Initial Temp: {get_cpu_temp():.2f}°C, trigger temp: >={trigger_temp:.2f}°C, hys. temp: {-hysteresis_temp:.2f}°C ")
-
+        message = f"Initial Temp: {get_cpu_temp():.2f}°C, trigger temp: >={trigger_temp:.2f}°C, hys. temp: {-hysteresis_temp:.2f}°C."
+        sys_logger.info(message)
+        file_logger.info(message)
 
     def get_cpu_temp() -> float:
         """Get CPU temperature.
@@ -185,18 +197,20 @@ def main():
                 temp = float(temp_str.strip()) / 1000.0
         except FileNotFoundError:
             msg = f"Error: Cannot find temperature file '{CPU_TEMP_FILE}'."
-            logger.critical(msg, exc_info=True)
+            sys_logger.critical(msg, exc_info=True)
+            file_logger.critical(msg, exc_info=True)
             exit(3)
         except PermissionError:
             msg = f"Error: Permission denied to access temperature file '{CPU_TEMP_FILE}'."
-            logger.critical(msg, exc_info=True)
+            sys_logger.critical(msg, exc_info=True)
+            file_logger.critical(msg, exc_info=True)
             exit(3)
         except:
             msg = f"Error: Unknown error reading temperature file '{CPU_TEMP_FILE}'."
-            logger.critical(msg, exc_info=True)
+            sys_logger.critical(msg, exc_info=True)
+            file_logger.critical(msg, exc_info=True)
             exit(3)
         return temp
-
 
     def set_fan(action: FanActions):
         """Activate/deactivate fan, calling i2c write function.
@@ -217,17 +231,20 @@ def main():
                 if attempt <= max_attempts:
                     attempt += 1
                     if verbose >= 2:
-                        logger.exception(f"Write i2c error, attempt {attempt}.", exc_info=True)
+                        message = f"Write i2c error, attempt {attempt}."
+                        sys_logger.exception(message, exc_info=True)
+                        file_logger.exception(message, exc_info=True)
                 else:
                     msg = f"Cannot write to i2c device after {attempt} attempts."
-                    logger.critical(msg, exc_info=True)
+                    sys_logger.critical(msg, exc_info=True)
+                    file_logger.critical(msg, exc_info=True)
                     exit(2)
             else:
                 success = True
 
-
     # Log management
-    logger = setup_logging(log_file, verbose)
+    sys_logger = setup_logging(verbose)
+    file_logger = setup_logging(verbose, log_file)
 
     # Check python version on runtime
     if sys.version_info < (3, 5):
@@ -244,7 +261,7 @@ def main():
     signal.signal(signal.SIGTERM, signal_handler)
 
     # Init
-    init_communication(logger)
+    init_communication()
 
     # Main loop
     while True:
@@ -259,12 +276,15 @@ def main():
         if fan_action != FanActions.NONE:
             set_fan(fan_action)
             if fan_action != last_action:
-                logger.info(f"Temp: {temperature:.2f}°C, Fan action: {fan_action.name}")
+                message = f"Temp: {temperature:.2f}°C, Fan action: {fan_action.name}"
+                sys_logger.info(message)
+                file_logger.info(message)
                 last_action = fan_action
             else:
-                logger.debug(f"Temp: {temperature:.2f}°C, Fan action: {fan_action.name}")
+                file_logger.info(
+                    f"Temp: {temperature:.2f}°C, Fan action: {fan_action.name}")
         elif verbose >= 2:
-            logger.debug(f"Temp: {temperature:.2f}°C")
+            file_logger.debug(f"Temp: {temperature:.2f}°C")
 
         sleep(sleep_seconds)
 
