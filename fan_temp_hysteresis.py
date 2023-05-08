@@ -17,6 +17,8 @@ DEVICE_ADDR = 0x0d
 """i2c device address used by yahboom RBG fan hat."""
 FAN_SPEED_REG = 0x08
 """i2c register address to regulate fan speed."""
+PRODUCT_CODE = "yahboom-raspi-cooling-hat"
+"""Product code of yahboom RGB fan hat."""
 MODULE_NAME = "yahboom-fan-ctrl"
 """Module name used for configuration file and log file."""
 
@@ -31,7 +33,7 @@ ERR_LOG_FILE = 5
 # Configuration global variables
 bus_number: int = 1  # raspberry pi with 256MB uses bus_number = 0
 """i2c bus number."""
-log_file: str = "/var/log/" + MODULE_NAME + ".log"
+log_file: str = f"/var/log/{PRODUCT_CODE}/" + MODULE_NAME + ".log"
 """Log file path."""
 verbose: int = 1
 """Verbosity level of messages."""
