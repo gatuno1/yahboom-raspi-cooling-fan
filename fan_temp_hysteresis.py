@@ -1,4 +1,6 @@
-﻿import smbus2
+﻿#!/usr/bin/env python3
+
+import smbus2
 import signal
 import sys
 import configparser
@@ -57,7 +59,7 @@ def init_communication(logger: logging.Logger):
     """Initialize communication with i2c device, also writing to log.
        If communication fails, exit with error code 2.
     """
-    logger.info("Starting {} log.".format(MODULE_NAME))
+    logger.info(f"Starting {MODULE_NAME} log.")
 
     try:
         with smbus2.SMBus(bus_number) as i2c:
@@ -65,16 +67,13 @@ def init_communication(logger: logging.Logger):
             # Stop fan
             i2c.write_byte_data(DEVICE_ADDR, FAN_SPEED_REG, 0x00)
     except Exception as e:
-        msg = "Cannot open i2c device at bus {}, address '{}'! Aborting.\n".format(
-            bus_number, hex(DEVICE_ADDR))
+        msg = f"Cannot open i2c device at bus {bus_number}, address '{hex(DEVICE_ADDR)}'! Aborting.\n"
         logger.critical(msg, exc_info=True)
         exit(2)
     else:
-        logger.info("Connected successfully to i2c device at bus {}, address '{}'.".format(
-            bus_number, hex(DEVICE_ADDR)))
+        logger.info(f"Connected successfully to i2c device at bus {bus_number}, address '{hex(DEVICE_ADDR)}'.")
 
-    logger.info("Initial Temp: {:.2f}°C, trigger temp: >={:.2f}°C, hys. temp: {:.2f}°C ".format(
-        get_cpu_temp(), trigger_temp, -hysteresis_temp))
+    logger.info(f"Initial Temp: {get_cpu_temp():.2f}°C, trigger temp: >={trigger_temp:.2f}°C, hys. temp: {-hysteresis_temp:.2f}°C ")
 
 
 def signal_name(signum: int) -> str:
@@ -90,7 +89,7 @@ def signal_name(signum: int) -> str:
     """
     try:
         if sys.version_info >= (3, 8):
-            return "{} - {}".format(signal.Signals(signum).name, signal.strsignal(signal.Signals(signum)))
+            return f"{signal.Signals(signum).name} - {signal.strsignal(signal.Signals(signum))}"
         else:
             sig = signal.Signals(signum).name
             return sig.name
@@ -101,13 +100,13 @@ def signal_name(signum: int) -> str:
 
 
 def tidyup(signal_num: int, frame):
+    global logger
     """Exit the program, after writing to log and turning off fan.
 
     Args:
         signal_num (int): signal value
     """
-    logger.info("Caught terminate signal '{}'. Turn fan off.\n".format(
-        signal_name(signal_num)))
+    logger.info(f"Caught terminate signal '{signal_name(signal_num)}'. Turn fan off.\n")
     set_fan(FanActions.OFF)
     exit(0)
 
@@ -125,17 +124,15 @@ def get_cpu_temp() -> float:
             temp_str = f.readline()
             temp = float(temp_str.strip()) / 1000.0
     except FileNotFoundError:
-        msg = "Error: Cannot find temperature file '{}'.".format(CPU_TEMP_FILE)
+        msg = f"Error: Cannot find temperature file '{CPU_TEMP_FILE}'."
         logger.critical(msg, exc_info=True)
         exit(3)
     except PermissionError:
-        msg = "Error: Permission denied to access temperature file '{}'.".format(
-            CPU_TEMP_FILE)
+        msg = f"Error: Permission denied to access temperature file '{CPU_TEMP_FILE}'."
         logger.critical(msg, exc_info=True)
         exit(3)
     except:
-        msg = "Error: Unknown error reading temperature file '{}'.".format(
-            CPU_TEMP_FILE)
+        msg = f"Error: Unknown error reading temperature file '{CPU_TEMP_FILE}'."
         logger.critical(msg, exc_info=True)
         exit(3)
     return temp
@@ -160,11 +157,9 @@ def set_fan(action: FanActions):
             if attempt <= max_attempts:
                 attempt += 1
                 if verbose >= 2:
-                    logger.exception("Write i2c error, attempt {}.".format(
-                        attempt), exc_info=True)
+                    logger.exception(f"Write i2c error, attempt {attempt}.", exc_info=True)
             else:
-                msg = "Cannot write to i2c device after {} attempts.".format(
-                    attempt)
+                msg = f"Cannot write to i2c device after {attempt} attempts."
                 logger.critical(msg, exc_info=True)
                 exit(2)
         else:
@@ -262,10 +257,9 @@ def main():
 
         if fan_action != FanActions.NONE:
             set_fan(fan_action)
-            logger.info('Temp: {:.2f}°C, Fan action: {}'.format(
-                temperature, fan_action.name))
+            logger.info(f"Temp: {temperature:.2f}°C, Fan action: {fan_action.name}")
         elif verbose >= 2:
-            logger.debug('Temp: {:.2f}°C'.format(temperature))
+            logger.debug(f"Temp: {temperature:.2f}°C")
 
         sleep(sleep_seconds)
 
