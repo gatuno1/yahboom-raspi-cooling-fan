@@ -117,7 +117,7 @@ def setup_logging(log_file: str, verbose_level: int) -> logging.Logger:
     new_logger.setLevel(logging.DEBUG if verbose_level >= 2 else logging.INFO)
     # Reference for log to file: https://stackoverflow.com/questions/6386698/how-to-write-to-a-file-using-the-logging-python-module
     fh = logging.FileHandler(log_file)
-    fh.setLevel(logging.DEBUG if verbose_level >= 2 else logging.INFO)
+    fh.setLevel(logging.DEBUG)
     formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
     fh.setFormatter(formatter)
     new_logger.addHandler(fh)
@@ -133,6 +133,8 @@ def main():
     """Current CPU temperature in Celsius."""
     fan_action: FanActions
     """Action to be taken by fan."""
+    last_action: FanActions = FanActions.OFF
+    """Last action taken by fan."""
     logger: logging.Logger
     """Logger object to write to log file and stdout."""
 
@@ -256,7 +258,11 @@ def main():
 
         if fan_action != FanActions.NONE:
             set_fan(fan_action)
-            logger.info(f"Temp: {temperature:.2f}°C, Fan action: {fan_action.name}")
+            if fan_action != last_action:
+                logger.info(f"Temp: {temperature:.2f}°C, Fan action: {fan_action.name}")
+                last_action = fan_action
+            else:
+                logger.debug(f"Temp: {temperature:.2f}°C, Fan action: {fan_action.name}")
         elif verbose >= 2:
             logger.debug(f"Temp: {temperature:.2f}°C")
 
