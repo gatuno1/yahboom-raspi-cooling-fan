@@ -12,11 +12,14 @@ import logging
 import logging.handlers
 from systemd.journal import JournalHandler
 
-# Constants
+# Device address
 DEVICE_ADDR = 0x0d
 """i2c device address used by yahboom RBG fan hat."""
+# Fan control register
 FAN_SPEED_REG = 0x08
 """i2c register address to regulate fan speed."""
+
+# Constants
 REPOSITORY = "yahboom-raspi-cooling-fan"
 """Product code of yahboom RGB fan hat."""
 MODULE_NAME = "yahboom-fan-ctrl"
@@ -165,7 +168,8 @@ def assure_log():
         os.makedirs(os.path.dirname(log_file), exist_ok=True)
     except OSError:
         print(
-            f"Error: Cannot create directory for log file '{log_file}'.", file=sys.stderr)
+            f"Error: Cannot create directory for log file '{log_file}'.",
+            file=sys.stderr)
         exit(ERR_LOG_FILE)
     # create log file if not exists, with user permissions
     try:
@@ -208,13 +212,14 @@ def main():
         """
         common_logger.info(f"Starting {MODULE_NAME} log.")
         try:
-            with smbus2.SMBus(bus_number) as i2c:
-                i2c.enable_pec(True)  # Enable "Packet Error Checking"
+            with smbus2.SMBus(bus_number) as bus:
+                bus.enable_pec(True)  # Enable "Packet Error Checking"
                 # Stop fan
-                i2c.write_byte_data(DEVICE_ADDR, FAN_SPEED_REG, 0x00)
+                bus.write_byte_data(DEVICE_ADDR, FAN_SPEED_REG, 0x00)
         except Exception as e:
             common_logger.critical(
-                f"Cannot open i2c device at bus {bus_number}, address '{hex(DEVICE_ADDR)}'! Aborting.\n", exc_info=True)
+                f"Cannot open i2c device at bus {bus_number}, address '{hex(DEVICE_ADDR)}'! Aborting.\n",
+                exc_info=True)
             exit(ERR_IC2_DEVICE)
         else:
             common_logger.info(
@@ -224,7 +229,7 @@ def main():
             f"Initial Temp: {get_cpu_temp():.2f}°C, trigger temp: >={trigger_temp:.2f}°C, hys. temp: {-hysteresis_temp:.2f}°C.")
 
     def get_cpu_temp() -> float:
-        """Get CPU temperature.
+        """Get CPU temperature from kernel device file.
 
         Returns:
             float: CPU temperature in Celsius
@@ -237,15 +242,18 @@ def main():
                 temp = float(temp_str.strip()) / 1000.0
         except FileNotFoundError:
             common_logger.critical(
-                f"Error: Cannot find system temperature file '{CPU_TEMP_FILE}'.", exc_info=True)
+                f"Error: Cannot find system temperature file '{CPU_TEMP_FILE}'.",
+                exc_info=True)
             exit(ERR_TEMPERATURE_FILE)
         except PermissionError:
             common_logger.critical(
-                f"Error: Permission denied to access temperature file '{CPU_TEMP_FILE}'.", exc_info=True)
+                f"Error: Permission denied to access temperature file '{CPU_TEMP_FILE}'.",
+                exc_info=True)
             exit(ERR_TEMPERATURE_FILE)
         except:
             common_logger.critical(
-                f"Error: Unknown error reading temperature file '{CPU_TEMP_FILE}'.", exc_info=True)
+                f"Error: Unknown error reading temperature file '{CPU_TEMP_FILE}'.",
+                exc_info=True)
             exit(ERR_TEMPERATURE_FILE)
         return temp
 
@@ -269,10 +277,12 @@ def main():
                     attempt += 1
                     if verbose >= 2:
                         common_logger.exception(
-                            f"Write i2c error, attempt {attempt}.", exc_info=True)
+                            f"Write i2c error, attempt {attempt}.",
+                            exc_info=True)
                 else:
                     common_logger.critical(
-                        f"Cannot write to i2c device after {attempt} attempts.", exc_info=True)
+                        f"Cannot write to i2c device after {attempt} attempts.",
+                        exc_info=True)
                     exit(ERR_IC2_DEVICE)
             else:
                 success = True
@@ -287,7 +297,8 @@ def main():
     # Check python version on runtime
     if sys.version_info < (3, 5):
         logger.critical(
-            "Python version must be 3.5 or higher to run this program.\n")
+            "Python version must be 3.5 or higher to run this program.\n",
+            exc_info=True)
         exit(ERR_PYTHON_VERSION)
 
     # System signal management
